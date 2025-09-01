@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <title>API Livros – Demo</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin: 24px; }
+    .card { border: 1px solid #ddd; padding: 16px; border-radius: 8px; margin-bottom: 12px; }
+    .row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+    label { font-weight: 600; }
+    input, button { padding: 8px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+    th, td { border: 1px solid #ccc; padding: 8px; }
+    th { background: #f5f5f5; text-align: left; }
+    .muted { color: #555; font-size: .95rem; }
+  </style>
+</head>
+<body>
+  <h1>API de Livros (REST + EF InMemory)</h1>
+  <p class="muted">
+    Faça login com <b>usuário = seu sobrenome</b> e <b>senha = seu RU</b> (definidos em <code>appsettings.json</code>).
+  </p>
+
+  <!-- Bloco com seus dados (sem autenticação) -->
+  <div class="card">
+    <h2>Seus dados</h2>
+    <button id="btnMe">Carregar /api/me</button>
+    <pre id="meBox"></pre>
+  </div>
+
+  <!-- Login muito simples: guarda o Authorization Basic em memória do navegador -->
+  <div class="card">
+    <h2>Login (Basic Auth)</h2>
+    <div class="row">
+      <div>
+        <label>Usuário (último sobrenome)</label><br/>
+        <input id="username" placeholder="Sahm"/>
+      </div>
+      <div>
+        <label>Senha (RU)</label><br/>
+        <input id="password" placeholder="0000000" />
+      </div>
+      <div style="align-self: end;">
+        <button id="btnLogin">Entrar</button>
+      </div>
+    </div>
+    <div id="loginStatus" class="muted"></div>
+  </div>
+
+  <!-- Lista e CRUD -->
+  <div class="card">
+    <h2>Livros</h2>
+    <div class="row">
+      <button id="btnListar">Listar (GET)</button>
+    </div>
+
+    <table id="tbl">
+      <thead>
+        <tr>
+          <th>ID</th><th>Autor</th><th>Título</th><th>Editora</th><th>Ano</th><th>Ações</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h3>Novo / Editar</h3>
+    <div class="row">
+      <input id="id" placeholder="Id (opcional p/POST)" />
+      <input id="author" placeholder="Autor" />
+      <input id="title" placeholder="Título" style="min-width: 280px;" />
+      <input id="publisher" placeholder="Editora" />
+      <input id="year" placeholder="Ano" type="number" />
+      <button id="btnCriar">POST Criar</button>
+      <button id="btnAtualizar">PUT Atualizar</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Parte 3 (Exercício guiado)</h2>
+    <p>
+      a) Excluir o livro do LEDUR (2019) &nbsp;
+      <button id="btnExcluirLedur">Excluir LEDUR (DELETE)</button>
+    </p>
+    <p>
+      b) Adicionar o livro do MARINHO (2016) &nbsp;
+      <button id="btnAddMarinho">Adicionar MARINHO (POST)</button>
+    </p>
+  </div>
+
+  <script>
+    // Armazena o header Authorization após login
+    let authHeader = null;
+
+    // Helper: monta headers com Authorization (se houver)
+    function headersJson() {
+      return {
+        "Content-Type": "application/json",
+        ...(authHeader ? { "Authorization": authHeader } : {})
+      };
+    }
+
+    // Renderiza tabela de livros
+    function renderRows(livros) {
+      const tbody = document.querySelector("#tbl tbody");
+      tbody.innerHTML = "";
+      for (const b of livros) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${b.id}</td>
+          <td>${b.author}</td>
+          <td>${b.title}</td>
+          <td>${b.publisher}</td>
+          <td>${b.year}</td>
+          <td>
+            <button data-id="${b.id}" class="btnFill">Preencher (editar)</button>
+            <button data-id="${b.id}" class="btnDel">Excluir</button>
+          </td>`;
+        tbody.appendChild(tr);
+      }
+
+      // Botões de preencher campos
+      document.querySelectorAll(".btnFill").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const id = btn.getAttribute("data-id");
+          const r = await fetch(`/api/books/${id}`, { headers: headersJson() });
+          if (!r.ok) { alert("Falha ao buscar livro."); return; }
+          const b = await r.json();
+          document.getElementById("id").value = b.id;
+          document.getElementById("author").value = b.author;
+          document.getElementById("title").value = b.title;
+          document.getElementById("publisher").value = b.publisher;
+          document.getElementById("year").value = b.year;
+        });
+      });
+
+      // Exclusão
+      document.querySelectorAll(".btnDel").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const id = btn.getAttribute("data-id");
+          if (!confirm(`Excluir livro ${id}?`)) return;
+          const r = await fetch(`/api/books/${id}`, {
+            method: "DELETE",
+            headers: headersJson()
+          });
+          if (r.ok) {
+            alert("Excluído.");
+            document.getElementById("btnListar").click();
+          } else {
+            alert("Falha ao excluir.");
+          }
+        });
+      });
+    }
+
+    // Botão /api/me (sem auth)
+    document.getElementById("btnMe").addEventListener("click", async () => {
+      const r = await fetch("/api/me");
+      document.getElementById("meBox").textContent = await r.text();
+    });
+
+    // Login: cria Authorization: Basic base64(user:pass)
+    document.getElementById("btnLogin").addEventListener("click", () => {
+      const u = document.getElementById("username").value.trim();
+      const p = document.getElementById("password").value.trim();
+      const token = btoa(`${u}:${p}`);
+      authHeader = `Basic ${token}`;
+      document.getElementById("loginStatus").textContent = "Login configurado (headers serão enviados nas próximas requisições).";
+    });
+
+    // Listar livros
+    document.getElementById("btnListar").addEventListener("click", async () => {
+      const r = await fetch("/api/books", { headers: headersJson() });
+      if (!r.ok) {
+        alert("Não autorizado? Faça login com seu sobrenome e RU.");
+        return;
+      }
+      const dados = await r.json();
+      renderRows(dados);
+    });
+
+    // Criar (POST)
+    document.getElementById("btnCriar").addEventListener("click", async () => {
+      const body = {
+        id: Number(document.getElementById("id").value) || 0,
+        author: document.getElementById("author").value,
+        title: document.getElementById("title").value,
+        publisher: document.getElementById("publisher").value,
+        year: Number(document.getElementById("year").value) || 0
+      };
+      const r = await fetch("/api/books", {
+        method: "POST",
+        headers: headersJson(),
+        body: JSON.stringify(body)
+      });
+      if (r.ok) {
+        alert("Criado com sucesso.");
+        document.getElementById("btnListar").click();
+      } else {
+        alert("Falha ao criar (verifique se está logado).");
+      }
+    });
+
+    // Atualizar (PUT)
+    document.getElementById("btnAtualizar").addEventListener("click", async () => {
+      const id = Number(document.getElementById("id").value);
+      if (!id) { alert("Informe o ID para atualizar."); return; }
+      const body = {
+        id,
+        author: document.getElementById("author").value,
+        title: document.getElementById("title").value,
+        publisher: document.getElementById("publisher").value,
+        year: Number(document.getElementById("year").value) || 0
+      };
+      const r = await fetch(`/api/books/${id}`, {
+        method: "PUT",
+        headers: headersJson(),
+        body: JSON.stringify(body)
+      });
+      if (r.ok) {
+        alert("Atualizado.");
+        document.getElementById("btnListar").click();
+      } else {
+        alert("Falha ao atualizar.");
+      }
+    });
+
+    // Parte 3a: Excluir LEDUR (tenta encontrar pelo título + ano)
+    document.getElementById("btnExcluirLedur").addEventListener("click", async () => {
+      const list = await (await fetch("/api/books", { headers: headersJson() })).json();
+      const alvo = list.find(b => b.author.includes("LEDUR") && b.year === 2019);
+      if (!alvo) { alert("Livro LEDUR 2019 não encontrado."); return; }
+      const r = await fetch(`/api/books/${alvo.id}`, {
+        method: "DELETE",
+        headers: headersJson()
+      });
+      alert(r.ok ? "LEDUR excluído." : "Falha ao excluir LEDUR.");
+      document.getElementById("btnListar").click();
+    });
+
+    // Parte 3b: Adicionar MARINHO (2016)
+    document.getElementById("btnAddMarinho").addEventListener("click", async () => {
+      const novo = {
+        id: 0,
+        author: "MARINHO, Antonio Lopes",
+        title: "Desenvolvimento de Aplicações para Internet",
+        publisher: "Pearson Education do Brasil",
+        year: 2016
+      };
+      const r = await fetch("/api/books", {
+        method: "POST",
+        headers: headersJson(),
+        body: JSON.stringify(novo)
+      });
+      alert(r.ok ? "MARINHO adicionado." : "Falha ao adicionar MARINHO.");
+      document.getElementById("btnListar").click();
+    });
+  </script>
+</body>
+</html>
