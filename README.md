@@ -18,10 +18,10 @@ Defina no appsettings.json:
 
 # Rotas
 
-*/ – página web (CRUD)
-*/api/me – dados do aluno (sem auth)
-*/api/books – livros (Basic Auth)
-*/swagger – docs
+* / – página web (CRUD)
+* /api/me – dados do aluno (sem auth)
+* /api/books – livros (Basic Auth)
+* /swagger – docs
 
 # Exemplos rápidos (cURL)
 ```
