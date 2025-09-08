@@ -4,6 +4,7 @@ API REST simples com **CRUD de livros** (GET/POST/PUT/DELETE), **autenticação 
 
 ## Rodar
 ```bash
+cd /workspaces/WEB_API/ApiLivros
 dotnet restore
 export ASPNETCORE_URLS=http://0.0.0.0:5000
 dotnet run
