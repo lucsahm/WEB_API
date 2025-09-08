@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Encodings.Web; 
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Options;
 
@@ -68,4 +69,5 @@ public class BasicAuthHandler : AuthenticationHandler<AuthenticationSchemeOption
         Response.Headers["WWW-Authenticate"] = "Basic realm=\"ApiLivros\"";
         return base.HandleChallengeAsync(properties);
     }
+
 }
